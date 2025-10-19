@@ -109,21 +109,10 @@ const Issues = () => {
                   key={issue.id}
                   issue={issue}
                   actions={
-                    issue.assignedTo === currentTeam?.name ? (
-                      <Button
-                        className="w-full"
-                        variant="outline"
-                        onClick={() => handleClose(issue.id)}
-                      >
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Close Issue
-                      </Button>
-                    ) : (
-                      <Button className="w-full" variant="ghost" disabled>
-                        <Lock className="w-4 h-4 mr-2" />
-                        Occupied by {issue.assignedTo}
-                      </Button>
-                    )
+                    <Button className="w-full" variant="ghost" disabled>
+                      <Lock className="w-4 h-4 mr-2" />
+                      Occupied by {issue.assignedTo}
+                    </Button>
                   }
                 />
               ))}
