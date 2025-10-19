@@ -3,13 +3,20 @@ import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, CheckCircle, Lock } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Lock, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import { useState, useEffect } from 'react';
 
 const Issues = () => {
   const { repo } = useParams<{ repo: string }>();
   const navigate = useNavigate();
   const { issues, currentTeam, occupyIssue, closeIssue } = useApp();
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const repoIssues = issues.filter(issue => issue.repo === repo);
   const openIssues = repoIssues.filter(i => i.status === 'open');
@@ -35,6 +42,22 @@ const Issues = () => {
     }
   };
 
+  const getTimeRemaining = (issue: any) => {
+    if (!issue.occupiedAt) return null;
+    
+    const duration = issue.tags.includes('easy') ? 20 * 60 * 1000 :
+                    issue.tags.includes('medium') ? 40 * 60 * 1000 :
+                    60 * 60 * 1000;
+    
+    const elapsed = Date.now() - issue.occupiedAt;
+    const remaining = Math.max(0, duration - elapsed);
+    
+    const minutes = Math.floor(remaining / 60000);
+    const seconds = Math.floor((remaining % 60000) / 1000);
+    
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
   const IssueCard = ({ issue, actions }: { issue: any; actions: React.ReactNode }) => (
     <Card className="shadow-card hover:shadow-elevated transition-all">
       <CardHeader>
@@ -52,6 +75,12 @@ const Issues = () => {
           <p className="text-sm text-muted-foreground mt-2">
             Assigned to: {issue.assignedTo}
           </p>
+        )}
+        {issue.status === 'occupied' && issue.occupiedAt && (
+          <div className="flex items-center gap-2 mt-2 text-sm font-medium text-primary">
+            <Clock className="w-4 h-4" />
+            {getTimeRemaining(issue)}
+          </div>
         )}
       </CardHeader>
       <CardContent>

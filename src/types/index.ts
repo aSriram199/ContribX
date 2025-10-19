@@ -11,6 +11,7 @@ export interface Issue {
   status: "open" | "occupied" | "closed";
   assignedTo: string | null;
   repo: string;
+  occupiedAt?: number;
 }
 
 export interface Repository {

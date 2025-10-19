@@ -92,9 +92,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     setIssues(prev => prev.map(issue =>
       issue.id === issueId && issue.status === 'open'
-        ? { ...issue, status: 'occupied', assignedTo: currentTeam.name }
+        ? { ...issue, status: 'occupied', assignedTo: currentTeam.name, occupiedAt: Date.now() }
         : issue
     ));
+  };
+
+  const checkExpiredIssues = () => {
+    const now = Date.now();
+    setIssues(prev => prev.map(issue => {
+      if (issue.status === 'occupied' && issue.occupiedAt) {
+        const duration = issue.tags.includes('easy') ? 20 * 60 * 1000 :
+                        issue.tags.includes('medium') ? 40 * 60 * 1000 :
+                        60 * 60 * 1000;
+        
+        if (now - issue.occupiedAt > duration) {
+          return { ...issue, status: 'open', assignedTo: null, occupiedAt: undefined };
+        }
+      }
+      return issue;
+    }));
   };
 
   const closeIssue = (issueId: string) => {
@@ -141,6 +157,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       team.name === teamName ? { ...team, points: team.points + points } : team
     ));
   };
+
+  useEffect(() => {
+    const interval = setInterval(checkExpiredIssues, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <AppContext.Provider value={{
