@@ -18,6 +18,7 @@ export interface Issue {
 }
 
 export interface Repository {
+  id?: string; // Firestore document ID
   name: string;
   url: string;
 }
