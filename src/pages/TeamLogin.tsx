@@ -9,12 +9,13 @@ import { toast } from 'sonner';
 
 const TeamLogin = () => {
   const [teamName, setTeamName] = useState('');
+  const [password, setPassword] = useState('');
   const { loginTeam } = useApp();
   const navigate = useNavigate();
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const result = loginTeam(teamName);
+    const result = loginTeam(teamName, password);
     
     if (result.success) {
       toast.success('Login successful!');
@@ -32,7 +33,7 @@ const TeamLogin = () => {
             <Users className="w-8 h-8 text-primary-foreground" />
           </div>
           <CardTitle className="text-3xl font-bold">Team Portal</CardTitle>
-          <CardDescription>Enter your team name to access the platform</CardDescription>
+          <CardDescription>Enter your team credentials to access the platform</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -42,6 +43,16 @@ const TeamLogin = () => {
                 placeholder="Team Name"
                 value={teamName}
                 onChange={(e) => setTeamName(e.target.value)}
+                className="h-12"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Input
+                type="password"
+                placeholder="Team Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="h-12"
                 required
               />

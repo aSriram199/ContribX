@@ -3,35 +3,54 @@ import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, CheckCircle, Lock, Clock } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Lock, Clock, GitPullRequest } from 'lucide-react';
 import { toast } from 'sonner';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useCallback, useMemo } from 'react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const Issues = () => {
   const { repo } = useParams<{ repo: string }>();
   const navigate = useNavigate();
   const { issues, currentTeam, occupyIssue, closeIssue } = useApp();
-  const [, setTick] = useState(0);
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
 
-  useEffect(() => {
-    const interval = setInterval(() => setTick(t => t + 1), 1000);
-    return () => clearInterval(interval);
-  }, []);
+  const repoIssues = useMemo(() => issues.filter(issue => issue.repo === repo), [issues, repo]);
+  const openIssues = useMemo(() => repoIssues.filter(i => i.status === 'open'), [repoIssues]);
+  const occupiedIssues = useMemo(() => repoIssues.filter(i => i.status === 'occupied'), [repoIssues]);
+  const closedIssues = useMemo(() => repoIssues.filter(i => i.status === 'closed'), [repoIssues]);
 
-  const repoIssues = issues.filter(issue => issue.repo === repo);
-  const openIssues = repoIssues.filter(i => i.status === 'open');
-  const occupiedIssues = repoIssues.filter(i => i.status === 'occupied');
-  const closedIssues = repoIssues.filter(i => i.status === 'closed');
+  const handleOccupy = useCallback((issueId: string) => {
+    const result = occupyIssue(issueId);
+    if (result.success) {
+      toast.success('Issue occupied successfully!');
+    } else {
+      toast.error(result.error || 'Failed to occupy issue');
+    }
+  }, [occupyIssue]);
 
-  const handleOccupy = (issueId: string) => {
-    occupyIssue(issueId);
-    toast.success('Issue occupied successfully!');
-  };
-
-  const handleClose = (issueId: string) => {
+  const handleClose = useCallback((issueId: string) => {
     closeIssue(issueId);
-    toast.success('Issue closed successfully!');
-  };
+    setShowCloseDialog(false);
+    setSelectedIssue(null);
+    toast.success('Issue marked as closed! Great work! 🎉', {
+      description: 'Your progress has been recorded and will be reviewed by the admin.'
+    });
+  }, [closeIssue]);
+
+  const confirmClose = useCallback((issueId: string) => {
+    setSelectedIssue(issueId);
+    setShowCloseDialog(true);
+  }, []);
 
   const getTagColor = (tag: string) => {
     switch (tag) {
@@ -58,36 +77,89 @@ const Issues = () => {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const IssueCard = ({ issue, actions }: { issue: any; actions: React.ReactNode }) => (
-    <Card className="shadow-card hover:shadow-elevated transition-all">
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <CardTitle className="text-base">#{issue.id} {issue.title}</CardTitle>
-        </div>
-        <div className="flex gap-2 mt-2">
-          {issue.tags.map((tag: string) => (
-            <Badge key={tag} className={getTagColor(tag)}>
-              {tag}
-            </Badge>
-          ))}
-        </div>
-        {issue.assignedTo && (
-          <p className="text-sm text-muted-foreground mt-2">
-            Assigned to: {issue.assignedTo}
-          </p>
+  // Memoized timer component to prevent unnecessary re-renders
+  const Timer = memo(({ issue }: { issue: any }) => {
+    const [time, setTime] = useState(getTimeRemaining(issue));
+
+    useEffect(() => {
+      const interval = setInterval(() => {
+        setTime(getTimeRemaining(issue));
+      }, 1000);
+      return () => clearInterval(interval);
+    }, [issue.occupiedAt, issue.tags]);
+
+    if (!time) return null;
+
+    // Calculate remaining time percentage
+    const duration = issue.tags.includes('easy') ? 20 * 60 * 1000 :
+                    issue.tags.includes('medium') ? 40 * 60 * 1000 :
+                    60 * 60 * 1000;
+    const elapsed = Date.now() - issue.occupiedAt;
+    const remaining = Math.max(0, duration - elapsed);
+    const percentRemaining = (remaining / duration) * 100;
+
+    // Color based on time remaining
+    const getTimerColor = () => {
+      if (percentRemaining > 50) return 'text-primary';
+      if (percentRemaining > 25) return 'text-warning';
+      return 'text-destructive';
+    };
+
+    return (
+      <div className={`flex items-center gap-2 mt-2 text-sm font-medium ${getTimerColor()}`}>
+        <Clock className="w-4 h-4" />
+        {time}
+        {percentRemaining <= 25 && (
+          <span className="text-xs">⚠️ Hurry!</span>
         )}
-        {issue.status === 'occupied' && issue.occupiedAt && (
-          <div className="flex items-center gap-2 mt-2 text-sm font-medium text-primary">
-            <Clock className="w-4 h-4" />
-            {getTimeRemaining(issue)}
-          </div>
-        )}
-      </CardHeader>
-      <CardContent>
-        {actions}
-      </CardContent>
-    </Card>
+      </div>
+    );
+  });
+
+  Timer.displayName = 'Timer';
+
+  const IssueCard = memo(
+    ({ issue, actions }: { issue: any; actions: React.ReactNode }) => {
+      return (
+        <Card className="shadow-card hover:shadow-elevated transition-shadow duration-300 card-hover-optimized">
+          <CardHeader>
+            <div className="flex justify-between items-start">
+              <CardTitle className="text-base">#{issue.id} {issue.title}</CardTitle>
+            </div>
+            <div className="flex gap-2 mt-2">
+              {issue.tags.map((tag: string) => (
+                <Badge key={tag} className={getTagColor(tag)}>
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+            {issue.assignedTo && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Assigned to: {issue.assignedTo}
+              </p>
+            )}
+            {issue.status === 'occupied' && issue.occupiedAt && (
+              <Timer issue={issue} />
+            )}
+          </CardHeader>
+          <CardContent>
+            {actions}
+          </CardContent>
+        </Card>
+      );
+    },
+    (prevProps, nextProps) => {
+      // Only re-render if issue data actually changes
+      return (
+        prevProps.issue.id === nextProps.issue.id &&
+        prevProps.issue.status === nextProps.issue.status &&
+        prevProps.issue.assignedTo === nextProps.issue.assignedTo &&
+        prevProps.issue.occupiedAt === nextProps.issue.occupiedAt
+      );
+    }
   );
+
+  IssueCard.displayName = 'IssueCard';
 
   return (
     <div className="min-h-screen bg-background">
@@ -138,10 +210,21 @@ const Issues = () => {
                   key={issue.id}
                   issue={issue}
                   actions={
-                    <Button className="w-full" variant="ghost" disabled>
-                      <Lock className="w-4 h-4 mr-2" />
-                      Occupied by {issue.assignedTo}
-                    </Button>
+                    issue.assignedTo === currentTeam?.name ? (
+                      <Button 
+                        className="w-full" 
+                        variant="default"
+                        onClick={() => confirmClose(issue.id)}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Mark as Solved
+                      </Button>
+                    ) : (
+                      <Button className="w-full" variant="ghost" disabled>
+                        <Lock className="w-4 h-4 mr-2" />
+                        Occupied by {issue.assignedTo}
+                      </Button>
+                    )
                   }
                 />
               ))}
@@ -170,6 +253,37 @@ const Issues = () => {
           </div>
         </div>
       </main>
+
+      <AlertDialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <GitPullRequest className="w-5 h-5" />
+              Submit Your Solution
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 pt-2">
+                <p className="font-semibold">Before marking this issue as solved, please ensure you have:</p>
+                <ol className="list-decimal list-inside space-y-2 pl-2">
+                  <li>Committed all your changes to your branch</li>
+                  <li>Pushed your branch to the repository</li>
+                  <li>Created a Pull Request (PR) with a clear description</li>
+                  <li>Linked the PR to this issue</li>
+                </ol>
+                <p className="text-sm text-muted-foreground mt-4">
+                  ⚠️ The admin will review your PR and verify the solution. Make sure your code is tested and follows the project guidelines.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => selectedIssue && handleClose(selectedIssue)}>
+              Yes, I've Created the PR
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

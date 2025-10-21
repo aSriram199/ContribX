@@ -12,6 +12,7 @@ export interface Issue {
   assignedTo: string | null;
   repo: string;
   occupiedAt?: number;
+  closedAt?: number;
 }
 
 export interface Repository {

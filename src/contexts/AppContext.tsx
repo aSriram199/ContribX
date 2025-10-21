@@ -6,9 +6,9 @@ interface AppContextType {
   teams: Team[];
   issues: Issue[];
   repositories: Repository[];
-  loginTeam: (teamName: string) => { success: boolean; error?: string };
+  loginTeam: (teamName: string, password: string) => { success: boolean; error?: string };
   logoutTeam: () => void;
-  occupyIssue: (issueId: string) => void;
+  occupyIssue: (issueId: string) => { success: boolean; error?: string };
   closeIssue: (issueId: string) => void;
   isAdmin: boolean;
   loginAdmin: (username: string, password: string) => boolean;
@@ -21,7 +21,15 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const ALLOWED_TEAMS = ["TeamAlpha", "TeamBravo", "TeamCharlie", "TeamDelta"];
+const ALLOWED_TEAMS = ["123", "TeamBravo", "TeamCharlie", "TeamDelta"];
+
+// Team passwords - each team has their own password
+const TEAM_PASSWORDS: { [key: string]: string } = {
+  "123": "123",
+  "TeamBravo": "bravo123",
+  "TeamCharlie": "charlie123",
+  "TeamDelta": "delta123",
+};
 
 const INITIAL_REPOSITORIES: Repository[] = [
   { name: "awesome-repo", url: "https://github.com/example/awesome-repo" },
@@ -42,7 +50,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [teams, setTeams] = useState<Team[]>(() => {
     const stored = localStorage.getItem('teams');
     if (stored) {
-      return JSON.parse(stored);
+      // Clear all active states on page load (handle page refresh)
+      const parsedTeams = JSON.parse(stored);
+      return parsedTeams.map((team: Team) => ({ ...team, active: false }));
     }
     return ALLOWED_TEAMS.map(name => ({ name, points: 0, active: false }));
   });
@@ -61,9 +71,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('issues', JSON.stringify(issues));
   }, [issues]);
 
-  const loginTeam = (teamName: string) => {
+  const loginTeam = (teamName: string, password: string) => {
     if (!ALLOWED_TEAMS.includes(teamName)) {
       return { success: false, error: "Team not recognized. Contact admin." };
+    }
+
+    // Check password
+    if (TEAM_PASSWORDS[teamName] !== password) {
+      return { success: false, error: "Invalid password. Please check your team password." };
     }
 
     const team = teams.find(t => t.name === teamName);
@@ -71,10 +86,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: "This team is already active. Only one active session allowed." };
     }
 
+    const updatedTeam = { ...team!, active: true };
     setTeams(prev => prev.map(t => 
       t.name === teamName ? { ...t, active: true } : t
     ));
-    setCurrentTeam(teams.find(t => t.name === teamName)!);
+    setCurrentTeam(updatedTeam);
     return { success: true };
   };
 
@@ -88,29 +104,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const occupyIssue = (issueId: string) => {
-    if (!currentTeam) return;
+    if (!currentTeam) {
+      return { success: false, error: "No team logged in" };
+    }
+    
+    // Check how many issues the team currently has occupied
+    const occupiedCount = issues.filter(
+      issue => issue.status === 'occupied' && issue.assignedTo === currentTeam.name
+    ).length;
+    
+    // Prevent occupying more than 3 issues
+    if (occupiedCount >= 3) {
+      return { success: false, error: "Your team has already occupied 3 issues. Please close an issue before occupying a new one." };
+    }
     
     setIssues(prev => prev.map(issue =>
       issue.id === issueId && issue.status === 'open'
         ? { ...issue, status: 'occupied', assignedTo: currentTeam.name, occupiedAt: Date.now() }
         : issue
     ));
+    
+    return { success: true };
   };
 
   const checkExpiredIssues = () => {
     const now = Date.now();
-    setIssues(prev => prev.map(issue => {
-      if (issue.status === 'occupied' && issue.occupiedAt) {
-        const duration = issue.tags.includes('easy') ? 20 * 60 * 1000 :
-                        issue.tags.includes('medium') ? 40 * 60 * 1000 :
-                        60 * 60 * 1000;
-        
-        if (now - issue.occupiedAt > duration) {
-          return { ...issue, status: 'open', assignedTo: null, occupiedAt: undefined };
+    setIssues(prev => {
+      const updated = prev.map(issue => {
+        if (issue.status === 'occupied' && issue.occupiedAt) {
+          const duration = issue.tags.includes('easy') ? 20 * 60 * 1000 :
+                          issue.tags.includes('medium') ? 40 * 60 * 1000 :
+                          60 * 60 * 1000;
+          
+          if (now - issue.occupiedAt > duration) {
+            // Issue expired - deduct points from the team
+            const teamName = issue.assignedTo;
+            if (teamName) {
+              // Deduct points based on difficulty
+              const penalty = issue.tags.includes('easy') ? 5 :
+                            issue.tags.includes('medium') ? 10 :
+                            15;
+              
+              setTeams(prevTeams => prevTeams.map(team =>
+                team.name === teamName 
+                  ? { ...team, points: Math.max(0, team.points - penalty) }
+                  : team
+              ));
+            }
+            
+            return { 
+              ...issue, 
+              status: 'open' as const, 
+              assignedTo: null, 
+              occupiedAt: undefined 
+            };
+          }
         }
-      }
-      return issue;
-    }));
+        return issue;
+      });
+      return updated;
+    });
   };
 
   const closeIssue = (issueId: string) => {
@@ -118,7 +171,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     setIssues(prev => prev.map(issue =>
       issue.id === issueId && issue.status === 'occupied' && issue.assignedTo === currentTeam.name
-        ? { ...issue, status: 'closed' }
+        ? { ...issue, status: 'closed', closedAt: Date.now() }
         : issue
     ));
   };

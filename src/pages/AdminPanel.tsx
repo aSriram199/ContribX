@@ -136,6 +136,34 @@ const AdminPanel = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-8">
+        {/* Statistics Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Total Issues</CardDescription>
+              <CardTitle className="text-3xl">{issues.length}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Open Issues</CardDescription>
+              <CardTitle className="text-3xl">{issues.filter(i => i.status === 'open').length}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>In Progress</CardDescription>
+              <CardTitle className="text-3xl">{issues.filter(i => i.status === 'occupied').length}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card className="border-success">
+            <CardHeader className="pb-2">
+              <CardDescription>Closed (Review PRs)</CardDescription>
+              <CardTitle className="text-3xl text-success">{issues.filter(i => i.status === 'closed').length}</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Add New Issue</CardTitle>
@@ -220,21 +248,49 @@ const AdminPanel = () => {
             <Button onClick={handleAwardPoints} className="w-full">
               Award Points
             </Button>
+            <div className="mt-4 p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground">
+              <p className="font-semibold mb-2">⏱️ Automatic Penalty System:</p>
+              <ul className="space-y-1">
+                <li>• Easy issues (20 min): -5 points if expired</li>
+                <li>• Medium issues (40 min): -10 points if expired</li>
+                <li>• Hard issues (60 min): -15 points if expired</li>
+              </ul>
+              <p className="mt-2 text-xs">Teams are penalized if they don't complete issues before time runs out.</p>
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>Manage Issues</CardTitle>
-            <CardDescription>Move and assign issues</CardDescription>
+            <CardDescription>Move and assign issues - Closed issues indicate completed work pending review</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {issues.map(issue => (
-                <div key={issue.id} className="flex items-center gap-4 p-4 border rounded-lg">
+                <div key={issue.id} className={`flex items-center gap-4 p-4 border rounded-lg ${issue.status === 'closed' ? 'bg-success/5 border-success' : ''}`}>
                   <div className="flex-1">
                     <p className="font-medium">#{issue.id} {issue.title}</p>
-                    <p className="text-sm text-muted-foreground">{issue.repo}</p>
+                    <div className="flex gap-2 items-center mt-1 flex-wrap">
+                      <p className="text-sm text-muted-foreground">{issue.repo}</p>
+                      {issue.status === 'closed' && issue.assignedTo && (
+                        <>
+                          <Badge variant="default" className="bg-success">
+                            Completed by {issue.assignedTo} - Review PR
+                          </Badge>
+                          {issue.closedAt && (
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(issue.closedAt).toLocaleString()}
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {issue.tags.map(tag => (
+                        <Badge key={tag} variant="outline" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                   <Select
                     value={issue.status}
