@@ -12,6 +12,9 @@ export interface Issue {
   assignedTo: string | null;
   repo: string;
   occupiedAt?: number;
+  closedAt?: number;
+  prUrl?: string;
+  prStatus?: "pending" | "approved" | "merged" | "rejected";
 }
 
 export interface Repository {

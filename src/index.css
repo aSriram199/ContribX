@@ -98,3 +98,11 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .card-hover-optimized {
+    will-change: box-shadow;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+  }
+}
