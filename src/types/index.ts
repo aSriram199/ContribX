@@ -13,6 +13,8 @@ export interface Issue {
   repo: string;
   occupiedAt?: number;
   closedAt?: number;
+  prUrl?: string;
+  prStatus?: "pending" | "approved" | "merged" | "rejected";
 }
 
 export interface Repository {

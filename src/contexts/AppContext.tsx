@@ -9,7 +9,8 @@ interface AppContextType {
   loginTeam: (teamName: string, password: string) => { success: boolean; error?: string };
   logoutTeam: () => void;
   occupyIssue: (issueId: string) => { success: boolean; error?: string };
-  closeIssue: (issueId: string) => void;
+  closeIssue: (issueId: string, prUrl: string) => { success: boolean; error?: string };
+  updatePrStatus: (issueId: string, status: 'approved' | 'merged' | 'rejected') => void;
   isAdmin: boolean;
   loginAdmin: (username: string, password: string) => boolean;
   logoutAdmin: () => void;
@@ -166,14 +167,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const closeIssue = (issueId: string) => {
-    if (!currentTeam) return;
+  const closeIssue = (issueId: string, prUrl: string) => {
+    if (!currentTeam) {
+      return { success: false, error: "No team logged in" };
+    }
+    
+    if (!prUrl || !prUrl.trim()) {
+      return { success: false, error: "PR URL is required" };
+    }
     
     setIssues(prev => prev.map(issue =>
       issue.id === issueId && issue.status === 'occupied' && issue.assignedTo === currentTeam.name
-        ? { ...issue, status: 'closed', closedAt: Date.now() }
+        ? { ...issue, status: 'closed', closedAt: Date.now(), prUrl: prUrl.trim(), prStatus: 'pending' }
         : issue
     ));
+    
+    return { success: true };
+  };
+
+  const updatePrStatus = (issueId: string, status: 'approved' | 'merged' | 'rejected') => {
+    const issue = issues.find(i => i.id === issueId);
+    
+    setIssues(prev => prev.map(issue => 
+      issue.id === issueId ? { ...issue, prStatus: status } : issue
+    ));
+    
+    // If PR is merged, award points automatically
+    if (status === 'merged' && issue && issue.assignedTo) {
+      const pointsMap = { easy: 10, medium: 20, hard: 30 };
+      const tag = issue.tags[0] as keyof typeof pointsMap;
+      const points = pointsMap[tag] || 0;
+      
+      setTeams(prev => prev.map(team => 
+        team.name === issue.assignedTo 
+          ? { ...team, points: team.points + points }
+          : team
+      ));
+    }
   };
 
   const loginAdmin = (username: string, password: string) => {
@@ -226,6 +256,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       logoutTeam,
       occupyIssue,
       closeIssue,
+      updatePrStatus,
       isAdmin,
       loginAdmin,
       logoutAdmin,
