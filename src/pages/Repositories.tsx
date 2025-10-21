@@ -45,11 +45,15 @@ const Repositories = () => {
         <div className="container mx-auto px-6 py-5">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
-              <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/30">
-                <Sparkles className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 rounded-xl overflow-hidden shadow-lg ring-2 ring-cyan-500/20">
+                <img 
+                  src="/image.png" 
+                  alt="DataVedhi Club" 
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-600 to-teal-600 bg-clip-text text-transparent">
                   {currentTeam.name}
                 </h1>
                 <p className="text-sm text-muted-foreground flex items-center gap-2">

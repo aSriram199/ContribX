@@ -125,7 +125,7 @@ const TeamLogin = () => {
               <Button
                 variant="ghost"
                 onClick={() => navigate('/admin')}
-                className="text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="text-sm hover:bg-cyan-50 dark:hover:bg-cyan-950 hover:text-cyan-700 dark:hover:text-cyan-300 transition-all"
               >
                 Access Admin Panel →
               </Button>

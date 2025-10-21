@@ -45,16 +45,21 @@ const Issues = () => {
     if (!selectedIssue) return;
     
     const result = occupyIssue(selectedIssue);
+    
+    // Close dialog first to prevent focus warning
     setShowOccupyDialog(false);
     
-    if (result.success) {
-      toast.success('Issue occupied successfully!');
-      setShowInstructionsDialog(true);
-    } else {
-      toast.error(result.error || 'Failed to occupy issue');
-      setSelectedIssue(null);
-      setSelectedIssueDetails(null);
-    }
+    // Then show feedback after a brief delay
+    setTimeout(() => {
+      if (result.success) {
+        toast.success('Issue occupied successfully!');
+        setShowInstructionsDialog(true);
+      } else {
+        toast.error(result.error || 'Failed to occupy issue');
+        setSelectedIssue(null);
+        setSelectedIssueDetails(null);
+      }
+    }, 50);
   }, [selectedIssue, occupyIssue]);
 
   const validatePrUrl = (url: string): boolean => {
@@ -169,7 +174,7 @@ const Issues = () => {
         <Card className="shadow-card hover:shadow-elevated transition-shadow duration-300 card-hover-optimized">
           <CardHeader>
             <div className="flex justify-between items-start">
-              <CardTitle className="text-base">#{issue.id} {issue.title}</CardTitle>
+              <CardTitle className="text-base">{issue.title}</CardTitle>
             </div>
             <div className="flex gap-2 mt-2">
               {issue.tags.map((tag: string) => (
